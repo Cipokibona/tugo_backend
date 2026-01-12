@@ -1,0 +1,39 @@
+# === Environnement Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+
+# === Virtualenv ===
+env/
+venv/
+.vscode/
+.budgetaire/
+.budgetaire/
+
+# === Fichiers de logs ===
+*.log
+
+# === Fichiers de tests ou coverage ===
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
+.cache/
+
+# === Fichiers temporaires ===
+*.swp
+*.bak
+*.tmp
+*.DS_Store
+Thumbs.db
+
+# === Fichiers liés à pre-commit ===
+.pre-commit-config.yaml.bak
+.pre-commit/
+
+# === Secrets par erreur ===
+.env
+*.env
+
+# === Base de données SQLite ===
+db.sqlite3
