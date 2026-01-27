@@ -9,6 +9,7 @@ class RideSerializer(serializers.ModelSerializer):
     bookings_count = serializers.IntegerField(
         source='bookings.count', read_only=True
     )
+    drive_rating = serializers.FloatField(source='driver.rating', read_only=True)
 
     class Meta:
         model = Ride
@@ -16,6 +17,7 @@ class RideSerializer(serializers.ModelSerializer):
             'id',
             'driver',
             'driver_username',
+            'drive_rating',
             'from_city',
             'to_city',
             'departure_date',

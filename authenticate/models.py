@@ -27,6 +27,7 @@ class User(AbstractUser):
         help_text="Score from 1 to 100"
     )
 
+    rating = models.FloatField(default=5.0)
     # --- Metadata ---
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
