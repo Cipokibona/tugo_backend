@@ -8,6 +8,9 @@ class Ride(models.Model):
     STATUS_CHOICES = (
         ('OPEN', 'Open'),
         ('FULL', 'Full'),
+        ('COMPLETED', 'Completed'),
+        ('IN_PROGRESS', 'In Progress'),
+        ('PROPOSED', 'Proposed'),
         ('CANCELLED', 'Cancelled'),
     )
 
@@ -15,6 +18,14 @@ class Ride(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name='rides_created'
+    )
+
+    proposer = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='rides_proposed'
     )
 
     # Route
@@ -36,7 +47,7 @@ class Ride(models.Model):
     additional_info = models.TextField(null=True, blank=True)
 
     status = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=STATUS_CHOICES,
         default='OPEN'
     )
