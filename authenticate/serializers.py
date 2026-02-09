@@ -24,3 +24,19 @@ class UserSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'contact_number', 'username', 'password']
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            first_name=validated_data['first_name'],
+            contact_number=validated_data.get('contact_number'),
+            username=validated_data['username'],
+            password=validated_data['password']
+        )
+        return user

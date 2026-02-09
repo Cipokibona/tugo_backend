@@ -19,6 +19,7 @@ class User(AbstractUser):
 
     city = models.CharField(max_length=100, null=True, blank=True)
     country = models.CharField(max_length=100, null=True, blank=True)
+    contact_number = models.CharField(max_length=20, null=True, blank=True)
 
     # --- Satisfaction ---
     satisfaction_score = models.PositiveSmallIntegerField(
