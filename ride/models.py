@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+# from django.contrib.gis.db import models as geomodels
 
 User = settings.AUTH_USER_MODEL
 
@@ -51,6 +52,10 @@ class Ride(models.Model):
         choices=STATUS_CHOICES,
         default='OPEN'
     )
+
+    # route = geomodels.LineStringField(null=True, blank=True, srid=4326)
+
+    vehicule = models.TextField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

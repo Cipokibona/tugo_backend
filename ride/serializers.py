@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.conf import settings
 from .models import Ride, RideBooking
+# from django.contrib.gis.geos import LineString
 
 User = settings.AUTH_USER_MODEL
 
@@ -27,9 +28,19 @@ class RideSerializer(serializers.ModelSerializer):
             'distance_km',
             'additional_info',
             'status',
+            # 'route',
+            'vehicule',
             'created_at',
             'bookings_count',
         ]
+
+    # def create(self, validated_data):
+    #     coords = validated_data.pop('route_coords', None)  # Liste [[lng, lat], [lng, lat]]
+    #     ride = Ride.objects.create(**validated_data)
+    #     if coords:
+    #         ride.route = LineString(coords)  # GeoDjango LineString
+    #         ride.save()
+    #     return ride
 
 
 class RideBookingSerializer(serializers.ModelSerializer):
