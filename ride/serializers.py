@@ -30,6 +30,7 @@ class RideSerializer(serializers.ModelSerializer):
             'status',
             # 'route',
             'vehicule',
+            'note',
             'created_at',
             'bookings_count',
         ]
