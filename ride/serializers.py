@@ -62,7 +62,18 @@ class RideBookingSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
+        # For updates, only validate seat availability if `ride` is explicitly changed.
+        if self.instance is not None and 'ride' not in data:
+            return data
+
         ride = data.get('ride')
-        if ride.bookings.count() >= ride.available_seats:
+        if ride is None:
+            return data
+
+        bookings_qs = ride.bookings.exclude(status__in=['CANCELLED', 'CLOSED'])
+        if self.instance is not None:
+            bookings_qs = bookings_qs.exclude(pk=self.instance.pk)
+
+        if bookings_qs.count() >= ride.available_seats:
             raise serializers.ValidationError("No available seats for this ride.")
         return data

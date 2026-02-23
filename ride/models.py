@@ -70,6 +70,7 @@ class RideBooking(models.Model):
         ('PENDING', 'Pending'),
         ('CONFIRMED', 'Confirmed'),
         ('CANCELLED', 'Cancelled'),
+        ('CLOSED', 'Closed'),
     )
 
     ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name='bookings')
