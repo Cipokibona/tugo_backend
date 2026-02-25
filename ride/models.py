@@ -8,6 +8,7 @@ User = settings.AUTH_USER_MODEL
 class Ride(models.Model):
     STATUS_CHOICES = (
         ('OPEN', 'Open'),
+        ('CLOSED', 'Closed'),
         ('FULL', 'Full'),
         ('COMPLETED', 'Completed'),
         ('IN_PROGRESS', 'In Progress'),
@@ -17,7 +18,9 @@ class Ride(models.Model):
 
     driver = models.ForeignKey(
         User,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='rides_created'
     )
 

@@ -2,9 +2,10 @@
 from rest_framework import viewsets, permissions
 from .models import Ride, RideBooking
 from .serializers import RideSerializer, RideBookingSerializer
+from notification.models import Notification
 from django.utils import timezone
-from django.db.models import Count, Q
-from datetime import datetime
+from django.db.models import Q
+from datetime import timedelta
 
 
 class RideViewSet(viewsets.ModelViewSet):
@@ -13,30 +14,28 @@ class RideViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        now = timezone.now()
+        now = timezone.localtime()
+        closed_cutoff = now - timedelta(hours=1)
 
-        # Build current date and time
-        today = now.date()
-        current_time = now.time()
-
-        # Past rides (past date OR today with past time)
-        past_rides = Ride.objects.filter(
-            Q(departure_date__lt=today)
-            | Q(departure_date=today, departure_time__lt=current_time),
-            status__in=['PENDING', 'OPEN']
-        ).annotate(
-            booking_count=Count('bookings')
-        ).filter(
-            booking_count=0
-        )
-
-        # Mark as CANCELLED when no bookings
-        past_rides.update(status='CANCELLED')
+        # Close rides 1 hour after departure, but only when current status is OPEN.
+        Ride.objects.filter(
+            Q(departure_date__lt=closed_cutoff.date())
+            | Q(
+                departure_date=closed_cutoff.date(),
+                departure_time__lte=closed_cutoff.time()
+            ),
+            status='OPEN'
+        ).update(status='CLOSED')
 
         return Ride.objects.all().order_by('-departure_date', '-departure_time')
 
     def perform_create(self, serializer):
-        serializer.save(driver=self.request.user)
+        status = serializer.validated_data.get('status', 'OPEN')
+
+        if status == 'PROPOSED':
+            serializer.save(proposer=self.request.user, driver=None)
+        else:
+            serializer.save(driver=self.request.user, proposer=None)
 
 
 class RideBookingViewSet(viewsets.ModelViewSet):
@@ -44,16 +43,10 @@ class RideBookingViewSet(viewsets.ModelViewSet):
     serializer_class = RideBookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        today = timezone.localdate()
-        RideBooking.objects.filter(
-            ride__departure_date__lt=today
-        ).exclude(
-            status__in=['CANCELLED', 'CLOSED']
-        ).update(status='CLOSED')
-        return super().get_queryset()
-
     def _sync_ride_status(self, ride):
+        if ride.status in ['CANCELLED', 'COMPLETED', 'CLOSED', 'PROPOSED']:
+            return
+
         active_bookings = ride.bookings.exclude(status__in=['CANCELLED', 'CLOSED']).count()
         target_status = 'FULL' if active_bookings >= ride.available_seats else 'OPEN'
 
@@ -63,6 +56,18 @@ class RideBookingViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         booking = serializer.save(passenger=self.request.user)
+        ride_owner = booking.ride.driver or booking.ride.proposer
+        if ride_owner and ride_owner != self.request.user:
+            Notification.objects.create(
+                recipient=ride_owner,
+                sender=self.request.user,
+                title='New booking request',
+                message=(
+                    f"{self.request.user.username} joined your ride "
+                    f"from {booking.ride.from_city} to {booking.ride.to_city}."
+                ),
+                notification_type='BOOKING_CREATED',
+            )
         self._sync_ride_status(booking.ride)
 
     def perform_update(self, serializer):

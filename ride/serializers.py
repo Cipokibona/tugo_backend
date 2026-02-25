@@ -29,8 +29,16 @@ class RideSerializer(serializers.ModelSerializer):
             'additional_info',
             'status',
             # 'route',
+            'proposer',
             'vehicule',
             'note',
+            'created_at',
+            'bookings_count',
+        ]
+        read_only_fields = [
+            'driver',
+            'driver_username',
+            'drive_rating',
             'created_at',
             'bookings_count',
         ]
@@ -68,6 +76,10 @@ class RideBookingSerializer(serializers.ModelSerializer):
 
         ride = data.get('ride')
         if ride is None:
+            return data
+
+        # Proposed rides are requests and should stay joinable by clients.
+        if ride.status == 'PROPOSED':
             return data
 
         bookings_qs = ride.bookings.exclude(status__in=['CANCELLED', 'CLOSED'])

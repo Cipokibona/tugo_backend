@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'authenticate',
     'ride',
     'chat',
+    'notification',
 ]
 
 AUTH_USER_MODEL = 'authenticate.User'
