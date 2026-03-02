@@ -26,6 +26,7 @@ class RideSerializer(serializers.ModelSerializer):
             'price',
             'available_seats',
             'distance_km',
+            'route_coords',
             'additional_info',
             'status',
             # 'route',

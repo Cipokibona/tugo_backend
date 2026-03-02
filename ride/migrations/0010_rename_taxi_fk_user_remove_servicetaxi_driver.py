@@ -10,11 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RenameField(
-            model_name='taxi',
-            old_name='fk_user',
-            new_name='driver',
-        ),
         migrations.RemoveField(
             model_name='servicetaxi',
             name='driver',

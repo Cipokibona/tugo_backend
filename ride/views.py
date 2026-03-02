@@ -58,6 +58,10 @@ def _schedule_taxi_timeout(service_taxi_id):
                 service_taxi=service_taxi,
                 action_required=False,
             )
+        Notification.objects.filter(
+            service_taxi=service_taxi,
+            notification_type='SERVICE_TAXI_REQUESTED',
+        ).update(is_read=True, action_required=False)
         close_old_connections()
 
     timer = threading.Timer(60, _handle_timeout)
@@ -252,10 +256,13 @@ class ServiceTaxiViewSet(viewsets.ModelViewSet):
             )
 
         if service_taxi.status != 'REQUESTED':
-            return Response(
-                {'detail': 'This taxi request has already been handled.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            Notification.objects.filter(
+                service_taxi=service_taxi,
+                notification_type='SERVICE_TAXI_REQUESTED',
+            ).update(is_read=True, action_required=False)
+            payload = self.get_serializer(service_taxi).data
+            payload['detail'] = 'This taxi request has already been handled.'
+            return Response(payload, status=status.HTTP_200_OK)
 
         decision = (request.data.get('decision') or '').upper()
         if decision not in ['ACCEPT', 'REJECT']:

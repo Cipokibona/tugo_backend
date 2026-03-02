@@ -47,6 +47,7 @@ class Ride(models.Model):
     available_seats = models.PositiveSmallIntegerField(default=1)
 
     distance_km = models.PositiveIntegerField(null=True, blank=True)
+    route_coords = models.JSONField(null=True, blank=True)
 
     additional_info = models.TextField(null=True, blank=True)
 
