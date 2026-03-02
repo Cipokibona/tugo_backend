@@ -15,6 +15,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             'title',
             'message',
             'notification_type',
+            'service_taxi',
+            'action_required',
             'is_read',
             'created_at',
         ]

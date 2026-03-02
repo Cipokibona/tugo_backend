@@ -20,6 +20,14 @@ class Notification(models.Model):
     title = models.CharField(max_length=255)
     message = models.TextField()
     notification_type = models.CharField(max_length=50, default='GENERAL')
+    service_taxi = models.ForeignKey(
+        'ride.ServiceTaxi',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notifications'
+    )
+    action_required = models.BooleanField(default=False)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

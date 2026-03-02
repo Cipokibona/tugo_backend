@@ -81,3 +81,68 @@ class RideBooking(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
     booked_at = models.DateTimeField(auto_now_add=True)
     special_requests = models.TextField(null=True, blank=True)
+
+
+class Taxi(models.Model):
+    driver = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='taxis'
+    )
+    license_plate_number = models.CharField(max_length=50, unique=True)
+    vehicle_model = models.CharField(max_length=120)
+    number_of_seats = models.PositiveSmallIntegerField(default=4)
+    image = models.URLField(max_length=500, null=True, blank=True)
+    color = models.CharField(max_length=50, null=True, blank=True)
+    vehicle_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    additional_details = models.TextField(null=True, blank=True)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    location_label = models.CharField(max_length=255, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.license_plate_number} - {self.vehicle_model}"
+
+
+class ServiceTaxi(models.Model):
+    STATUS_CHOICES = (
+        ('REQUESTED', 'Requested'),
+        ('ACCEPTED', 'Accepted'),
+        ('IN_PROGRESS', 'In Progress'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
+    )
+
+    taxi = models.ForeignKey(
+        Taxi,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='services'
+    )
+    client = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='taxi_services_as_client'
+    )
+    pickup_location = models.CharField(max_length=255)
+    dropoff_location = models.CharField(max_length=255)
+    pickup_date = models.DateField(null=True, blank=True)
+    pickup_time = models.TimeField(null=True, blank=True)
+    price = models.PositiveIntegerField(null=True, blank=True, help_text="Price in BIF")
+    distance_km = models.PositiveIntegerField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='REQUESTED')
+    notes = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return (
+            f"Taxi service {self.id} - "
+            f"{self.pickup_location} to {self.dropoff_location} ({self.status})"
+        )

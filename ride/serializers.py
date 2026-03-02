@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.conf import settings
-from .models import Ride, RideBooking
+from .models import Ride, RideBooking, Taxi, ServiceTaxi
 # from django.contrib.gis.geos import LineString
 
 User = settings.AUTH_USER_MODEL
@@ -89,3 +89,69 @@ class RideBookingSerializer(serializers.ModelSerializer):
         if bookings_qs.count() >= ride.available_seats:
             raise serializers.ValidationError("No available seats for this ride.")
         return data
+
+
+class TaxiSerializer(serializers.ModelSerializer):
+    driver_username = serializers.CharField(source='driver.username', read_only=True)
+
+    class Meta:
+        model = Taxi
+        fields = [
+            'id',
+            'driver',
+            'driver_username',
+            'license_plate_number',
+            'vehicle_model',
+            'number_of_seats',
+            'image',
+            'color',
+            'vehicle_year',
+            'additional_details',
+            'latitude',
+            'longitude',
+            'location_label',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'driver',
+            'driver_username',
+            'created_at',
+            'updated_at',
+        ]
+
+
+class ServiceTaxiSerializer(serializers.ModelSerializer):
+    client_username = serializers.CharField(source='client.username', read_only=True)
+    taxi_details = TaxiSerializer(source='taxi', read_only=True)
+    driver = serializers.IntegerField(source='taxi.driver.id', read_only=True)
+    driver_username = serializers.CharField(source='taxi.driver.username', read_only=True)
+
+    class Meta:
+        model = ServiceTaxi
+        fields = [
+            'id',
+            'taxi',
+            'taxi_details',
+            'driver',
+            'driver_username',
+            'client',
+            'client_username',
+            'pickup_location',
+            'dropoff_location',
+            'pickup_date',
+            'pickup_time',
+            'price',
+            'distance_km',
+            'status',
+            'notes',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'client',
+            'client_username',
+            'created_at',
+            'updated_at',
+        ]
