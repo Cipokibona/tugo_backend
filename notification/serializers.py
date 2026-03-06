@@ -1,5 +1,6 @@
-﻿from rest_framework import serializers
-from .models import Notification
+from rest_framework import serializers
+
+from .models import Notification, PushSubscription
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -21,3 +22,18 @@ class NotificationSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['sender', 'sender_username', 'created_at']
+
+
+class PushSubscriptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PushSubscription
+        fields = [
+            'endpoint',
+            'p256dh',
+            'auth',
+            'expiration_time',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at']

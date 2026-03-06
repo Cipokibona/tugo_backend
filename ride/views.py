@@ -77,6 +77,7 @@ class RideViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         now = timezone.localtime()
         closed_cutoff = now - timedelta(hours=1)
+        proposed_cutoff = timezone.now() - timedelta(hours=12)
 
         Ride.objects.filter(
             Q(departure_date__lt=closed_cutoff.date())
@@ -87,7 +88,10 @@ class RideViewSet(viewsets.ModelViewSet):
             status='OPEN'
         ).update(status='CLOSED')
 
-        return Ride.objects.all().order_by('-departure_date', '-departure_time')
+        return Ride.objects.exclude(
+            status='PROPOSED',
+            created_at__lt=proposed_cutoff,
+        ).order_by('-departure_date', '-departure_time')
 
     def perform_create(self, serializer):
         ride_status = serializer.validated_data.get('status', 'OPEN')

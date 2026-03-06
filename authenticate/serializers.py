@@ -16,6 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
             'username',
             'first_name',
             'email',
+            'contact_number',
             'age',
             'gender',
             'city',
@@ -41,3 +42,14 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=validated_data['password']
         )
         return user
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=4)
+
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Current password is incorrect.')
+        return value
