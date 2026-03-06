@@ -101,6 +101,13 @@ class RideViewSet(viewsets.ModelViewSet):
         else:
             serializer.save(driver=self.request.user, proposer=None)
 
+    @action(detail=False, methods=['get'], url_path=r'by-share/(?P<share_code>[^/.]+)')
+    def by_share(self, request, share_code=None):
+        ride = self.get_queryset().filter(share_code=share_code).first()
+        if not ride:
+            return Response({'detail': 'Ride not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(self.get_serializer(ride).data, status=status.HTTP_200_OK)
+
 
 class RideBookingViewSet(viewsets.ModelViewSet):
     queryset = RideBooking.objects.all().order_by('-booked_at')

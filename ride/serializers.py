@@ -16,6 +16,7 @@ class RideSerializer(serializers.ModelSerializer):
         model = Ride
         fields = [
             'id',
+            'share_code',
             'driver',
             'driver_username',
             'drive_rating',
@@ -37,6 +38,7 @@ class RideSerializer(serializers.ModelSerializer):
             'bookings_count',
         ]
         read_only_fields = [
+            'share_code',
             'driver',
             'driver_username',
             'drive_rating',

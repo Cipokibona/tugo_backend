@@ -1,8 +1,13 @@
 from django.db import models
 from django.conf import settings
+import secrets
 # from django.contrib.gis.db import models as geomodels
 
 User = settings.AUTH_USER_MODEL
+
+
+def generate_share_code():
+    return secrets.token_hex(8)
 
 # Create your models here.
 class Ride(models.Model):
@@ -62,6 +67,13 @@ class Ride(models.Model):
     vehicule = models.TextField(null=True, blank=True)
 
     note = models.TextField(null=True, blank=True)
+    share_code = models.CharField(
+        max_length=32,
+        unique=True,
+        db_index=True,
+        default=generate_share_code,
+        editable=False,
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
