@@ -13,8 +13,30 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 import os
 
+def load_env_file(path):
+    if not path.exists():
+        return
+
+    for raw_line in path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+
+        key, value = line.split('=', 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
+try:
+    from decouple import config
+except ImportError:
+    def config(name, default=''):
+        return os.getenv(name, default)
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_env_file(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -150,6 +172,11 @@ REST_FRAMEWORK = {
     ],
 }
 
-VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
-VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', '')
-VAPID_CLAIMS_SUB = os.getenv('VAPID_CLAIMS_SUB', 'mailto:admin@example.com')
+VAPID_PUBLIC_KEY = config('VAPID_PUBLIC_KEY', default='')
+VAPID_PRIVATE_KEY = config('VAPID_PRIVATE_KEY', default='')
+VAPID_CLAIMS_SUB = config('VAPID_CLAIMS_SUB', default='mailto:admin@example.com')
+
+AFRIPAY_CHECKOUT_URL = config('AFRIPAY_CHECKOUT_URL', default='https://www.afripay.africa/checkout/index.php')
+AFRIPAY_APP_ID = config('AFRIPAY_APP_ID', default='')
+AFRIPAY_APP_SECRET = config('AFRIPAY_APP_SECRET', default='')
+AFRIPAY_RETURN_URL = config('AFRIPAY_RETURN_URL', default='http://localhost:4200/home')

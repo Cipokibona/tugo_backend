@@ -1,13 +1,18 @@
 import threading
 from datetime import timedelta
 from math import atan2, cos, radians, sin, sqrt
+from secrets import token_urlsafe
 
+from django.conf import settings
+from django.core.cache import cache
+from django.http import HttpResponse
 from django.db import close_old_connections
 from django.db.models import Case, IntegerField, Q, When
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from notification.models import Notification
 from .models import Ride, RideBooking, ServiceTaxi, Taxi
@@ -17,6 +22,97 @@ from .serializers import (
     ServiceTaxiSerializer,
     TaxiSerializer,
 )
+
+
+class AfripayCheckoutProxyView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        app_id = getattr(settings, 'AFRIPAY_APP_ID', '').strip()
+        app_secret = getattr(settings, 'AFRIPAY_APP_SECRET', '').strip()
+        checkout_url = getattr(settings, 'AFRIPAY_CHECKOUT_URL', '').strip()
+
+        if not app_id or not app_secret or not checkout_url:
+            return Response(
+                {'detail': 'Afripay payment is not configured on the server.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        amount = str(request.data.get('amount', '')).strip()
+        currency = str(request.data.get('currency', 'BIF')).strip() or 'BIF'
+        comment = str(request.data.get('comment', '')).strip()
+        client_token = str(request.data.get('client_token', '')).strip()
+        return_url = str(
+            request.data.get('return_url') or getattr(settings, 'AFRIPAY_RETURN_URL', '')
+        ).strip()
+
+        if not amount or not comment or not return_url:
+            return Response(
+                {'detail': 'amount, comment, and return_url are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        launch_token = token_urlsafe(24)
+        cache.set(f'afripay_checkout:{launch_token}', {
+            'amount': amount,
+            'currency': currency,
+            'comment': comment,
+            'client_token': client_token,
+            'return_url': return_url,
+            'app_id': app_id,
+            'app_secret': app_secret,
+        }, timeout=300)
+
+        launch_url = request.build_absolute_uri(f'/api/afripay/checkout/launch/{launch_token}/')
+        return Response({'launch_url': launch_url}, status=status.HTTP_200_OK)
+
+
+class AfripayCheckoutLaunchView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, token):
+        payload = cache.get(f'afripay_checkout:{token}')
+        if not payload:
+            return HttpResponse('Afripay checkout session expired or not found.', status=410)
+
+        cache.delete(f'afripay_checkout:{token}')
+
+        checkout_url = getattr(settings, 'AFRIPAY_CHECKOUT_URL', '').strip()
+        if not checkout_url:
+            return HttpResponse('Afripay payment is not configured on the server.', status=503)
+
+        def escape_attr(value):
+            return (
+                str(value)
+                .replace('&', '&amp;')
+                .replace('"', '&quot;')
+                .replace("'", '&#x27;')
+                .replace('<', '&lt;')
+                .replace('>', '&gt;')
+            )
+
+        hidden_inputs = '\n'.join(
+            f'<input type="hidden" name="{escape_attr(key)}" value="{escape_attr(value)}">'
+            for key, value in payload.items()
+        )
+
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Afripay Checkout</title>
+</head>
+<body>
+  <form id="afripay-launch-form" action="{escape_attr(checkout_url)}" method="post">
+    {hidden_inputs}
+  </form>
+  <script>
+    document.getElementById('afripay-launch-form').submit();
+  </script>
+</body>
+</html>"""
+        return HttpResponse(html, content_type='text/html')
 
 
 def _schedule_taxi_timeout(service_taxi_id):
