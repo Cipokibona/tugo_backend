@@ -21,6 +21,8 @@ class UserSerializer(serializers.ModelSerializer):
             'gender',
             'city',
             'country',
+            'is_superuser',
+            'last_login',
             'satisfaction_score',
             'driver_profile',
             'created_at',

@@ -172,6 +172,10 @@ REST_FRAMEWORK = {
     ],
 }
 
+SIMPLE_JWT = {
+    'UPDATE_LAST_LOGIN': True,
+}
+
 VAPID_PUBLIC_KEY = config('VAPID_PUBLIC_KEY', default='')
 VAPID_PRIVATE_KEY = config('VAPID_PRIVATE_KEY', default='')
 VAPID_CLAIMS_SUB = config('VAPID_CLAIMS_SUB', default='mailto:admin@example.com')

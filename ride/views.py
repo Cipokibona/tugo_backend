@@ -1,4 +1,4 @@
-import threading
+﻿import threading
 from datetime import timedelta
 from math import atan2, cos, radians, sin, sqrt
 from secrets import token_urlsafe
