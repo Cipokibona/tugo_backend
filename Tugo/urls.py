@@ -27,4 +27,5 @@ urlpatterns = [
     path('api/', include('ride.urls')), # rides & bookings
     path('api/', include('chat.urls')), # conversations & messages
     path('api/', include('notification.urls')), # user notifications
+    path('api/', include('wallet.urls')),
 ]

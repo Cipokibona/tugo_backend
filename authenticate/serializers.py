@@ -25,6 +25,7 @@ class UserSerializer(serializers.ModelSerializer):
             'driver_profile',
             'created_at',
             'updated_at',
+            'is_staff',
         ]
 
 class RegisterSerializer(serializers.ModelSerializer):

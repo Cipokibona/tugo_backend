@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 import secrets
 # from django.contrib.gis.db import models as geomodels
 
@@ -76,6 +77,14 @@ class Ride(models.Model):
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.status == 'COMPLETED' and self.completed_at is None:
+            self.completed_at = timezone.now()
+        elif self.status != 'COMPLETED':
+            self.completed_at = None
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.from_city} → {self.to_city} ({self.departure_date})"
@@ -94,6 +103,9 @@ class RideBooking(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
     booked_at = models.DateTimeField(auto_now_add=True)
     special_requests = models.TextField(null=True, blank=True)
+    payment_method = models.CharField(max_length=16, default='AFRIPAY')
+    is_disputed = models.BooleanField(default=False)
+    wallet_settlement = models.BooleanField(default=False)
 
 
 class Taxi(models.Model):
@@ -159,3 +171,31 @@ class ServiceTaxi(models.Model):
             f"Taxi service {self.id} - "
             f"{self.pickup_location} to {self.dropoff_location} ({self.status})"
         )
+
+
+class GameScore(models.Model):
+    MODE_CHOICES = (
+        ('DRIVER', 'Driver'),
+        ('PEDESTRIAN', 'Pedestrian'),
+    )
+
+    player = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='game_scores'
+    )
+    mode = models.CharField(max_length=16, choices=MODE_CHOICES)
+    score = models.IntegerField(default=0)
+    distance = models.PositiveIntegerField(default=0)
+    remaining_time = models.PositiveSmallIntegerField(default=0)
+    money_delta = models.IntegerField(default=0)
+    max_combo = models.PositiveSmallIntegerField(default=0)
+    outcome = models.CharField(max_length=32, default='FINISHED')
+    payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-score', '-distance', '-remaining_time', '-created_at']
+
+    def __str__(self):
+        return f"{self.player} - {self.mode} - {self.score}"

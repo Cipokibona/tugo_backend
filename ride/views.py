@@ -7,7 +7,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.db import close_old_connections
-from django.db.models import Case, IntegerField, Q, When
+from django.db import transaction
+from django.db.models import Avg, Case, Count, IntegerField, Max, Q, Sum, When
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -15,8 +16,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from notification.models import Notification
-from .models import Ride, RideBooking, ServiceTaxi, Taxi
+from .models import GameScore, Ride, RideBooking, ServiceTaxi, Taxi
 from .serializers import (
+    GameScoreSerializer,
     RideBookingSerializer,
     RideSerializer,
     ServiceTaxiSerializer,
@@ -209,6 +211,44 @@ class RideBookingViewSet(viewsets.ModelViewSet):
     queryset = RideBooking.objects.all().order_by('-booked_at')
     serializer_class = RideBookingSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return RideBooking.objects.all().order_by('-booked_at')
+        return RideBooking.objects.filter(
+            Q(passenger=self.request.user) | Q(ride__driver=self.request.user) | Q(ride__proposer=self.request.user)
+        ).order_by('-booked_at')
+
+    @action(detail=False, methods=['post'], url_path='pay-with-wallet')
+    def pay_with_wallet(self, request):
+        from decimal import Decimal
+        from django.conf import settings
+        from .models import RideBooking
+        from wallet.services import debit
+
+        try:
+            ride_id = int(request.data.get('ride'))
+            seats = int(request.data.get('seats', 1))
+            if seats < 1:
+                raise ValueError()
+        except (TypeError, ValueError):
+            return Response({'detail': 'A ride and a positive seat count are required.'}, status=400)
+
+        with transaction.atomic():
+            ride = Ride.objects.select_for_update().filter(pk=ride_id).first()
+            if not ride:
+                return Response({'detail': 'Ride not found.'}, status=404)
+            active_count = ride.bookings.exclude(status__in=['CANCELLED', 'CLOSED']).count()
+            if active_count + seats > ride.available_seats:
+                return Response({'detail': 'Not enough seats remain.'}, status=400)
+            base = Decimal(str(ride.price))
+            commission = base * Decimal(str(getattr(settings, 'RIDE_PLATFORM_COMMISSION_RATE', '0.10')))
+            seat_total = (base + commission + commission * Decimal('0.18')).quantize(Decimal('0.01'))
+            debit(request.user, seat_total * seats, 'RIDE_PAYMENT', 'RIDE', f'Payment for {seats} seat(s) on ride {ride.pk}')
+            bookings = [RideBooking.objects.create(ride=ride, passenger=request.user, status='CONFIRMED',
+                        payment_method='TUGO_MONEY') for _ in range(seats)]
+            self._sync_ride_status(ride)
+        return Response(RideBookingSerializer(bookings, many=True, context=self.get_serializer_context()).data, status=201)
 
     def _sync_ride_status(self, ride):
         if ride.status in ['CANCELLED', 'COMPLETED', 'CLOSED', 'PROPOSED']:
@@ -418,3 +458,50 @@ class ServiceTaxiViewSet(viewsets.ModelViewSet):
             )
 
         return Response(self.get_serializer(service_taxi).data, status=status.HTTP_200_OK)
+
+
+class GameScoreViewSet(viewsets.ModelViewSet):
+    serializer_class = GameScoreSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'post', 'head', 'options']
+
+    def get_queryset(self):
+        queryset = GameScore.objects.select_related('player').filter(player=self.request.user)
+        mode = (self.request.query_params.get('mode') or '').upper()
+        if mode in {'DRIVER', 'PEDESTRIAN'}:
+            queryset = queryset.filter(mode=mode)
+        return queryset.order_by('-score', '-distance', '-remaining_time', '-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(player=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='leaderboard')
+    def leaderboard(self, request):
+        mode = (request.query_params.get('mode') or '').upper()
+        queryset = GameScore.objects.select_related('player').all()
+        if mode in {'DRIVER', 'PEDESTRIAN'}:
+            queryset = queryset.filter(mode=mode)
+        queryset = queryset.order_by('-score', '-distance', '-remaining_time', '-created_at')[:20]
+        return Response(self.get_serializer(queryset, many=True).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        queryset = self.get_queryset()
+        aggregates = queryset.aggregate(
+            sessions=Count('id'),
+            best_score=Max('score'),
+            total_distance=Sum('distance'),
+            avg_score=Avg('score'),
+            total_money_delta=Sum('money_delta'),
+            best_combo=Max('max_combo'),
+        )
+        best_run = queryset.first()
+        return Response({
+            'sessions': aggregates['sessions'] or 0,
+            'best_score': aggregates['best_score'] or 0,
+            'total_distance': aggregates['total_distance'] or 0,
+            'avg_score': round(float(aggregates['avg_score'] or 0), 1),
+            'total_money_delta': aggregates['total_money_delta'] or 0,
+            'best_combo': aggregates['best_combo'] or 0,
+            'best_run': self.get_serializer(best_run).data if best_run else None,
+        }, status=status.HTTP_200_OK)

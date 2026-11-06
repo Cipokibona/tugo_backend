@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'ride',
     'chat',
     'notification',
+    'wallet',
 ]
 
 AUTH_USER_MODEL = 'authenticate.User'
@@ -180,3 +181,4 @@ AFRIPAY_CHECKOUT_URL = config('AFRIPAY_CHECKOUT_URL', default='https://www.afrip
 AFRIPAY_APP_ID = config('AFRIPAY_APP_ID', default='')
 AFRIPAY_APP_SECRET = config('AFRIPAY_APP_SECRET', default='')
 AFRIPAY_RETURN_URL = config('AFRIPAY_RETURN_URL', default='http://localhost:4200/home')
+RIDE_PLATFORM_COMMISSION_RATE = config('RIDE_PLATFORM_COMMISSION_RATE', default='0.10')

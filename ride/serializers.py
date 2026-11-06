@@ -1,6 +1,8 @@
 from rest_framework import serializers
+from django.db import transaction
 from django.conf import settings
-from .models import Ride, RideBooking, Taxi, ServiceTaxi
+from django.conf import settings
+from .models import GameScore, Ride, RideBooking, Taxi, ServiceTaxi
 # from django.contrib.gis.geos import LineString
 
 User = settings.AUTH_USER_MODEL
@@ -70,7 +72,27 @@ class RideBookingSerializer(serializers.ModelSerializer):
             'status',
             'booked_at',
             'special_requests',
+            'payment_method',
         ]
+        read_only_fields = ['passenger']
+
+    @transaction.atomic
+    def create(self, validated_data):
+        payment_method = validated_data.pop('payment_method', 'AFRIPAY').upper()
+        passenger = self.context['request'].user
+        ride = validated_data['ride']
+        if payment_method == 'TUGO_MONEY':
+            from decimal import Decimal
+            from wallet.services import debit
+            base = Decimal(str(ride.price))
+            commission = base * Decimal(str(getattr(settings, 'RIDE_PLATFORM_COMMISSION_RATE', '0.10')))
+            total = (base + commission + commission * Decimal('0.18')).quantize(Decimal('0.01'))
+            debit(passenger, total, 'RIDE_PAYMENT', 'RIDE', f'Payment for ride {ride.pk}')
+            validated_data['status'] = 'CONFIRMED'
+        elif payment_method != 'AFRIPAY':
+            raise serializers.ValidationError({'payment_method': 'Unsupported payment method.'})
+        validated_data['payment_method'] = payment_method
+        return super().create(validated_data)
 
     def validate(self, data):
         # For updates, only validate seat availability if `ride` is explicitly changed.
@@ -157,4 +179,30 @@ class ServiceTaxiSerializer(serializers.ModelSerializer):
             'client_username',
             'created_at',
             'updated_at',
+        ]
+
+
+class GameScoreSerializer(serializers.ModelSerializer):
+    player_username = serializers.CharField(source='player.username', read_only=True)
+
+    class Meta:
+        model = GameScore
+        fields = [
+            'id',
+            'player',
+            'player_username',
+            'mode',
+            'score',
+            'distance',
+            'remaining_time',
+            'money_delta',
+            'max_combo',
+            'outcome',
+            'payload',
+            'created_at',
+        ]
+        read_only_fields = [
+            'player',
+            'player_username',
+            'created_at',
         ]
