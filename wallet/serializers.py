@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from decimal import Decimal
 from .models import Wallet, WalletTransaction, WithdrawalRequest
 
 
@@ -7,6 +8,13 @@ class WalletSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wallet
         fields = ['id', 'user_id', 'balance', 'pending_balance', 'total_earned', 'total_withdrawn', 'created_at']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        for field in ('balance', 'pending_balance', 'total_earned', 'total_withdrawn'):
+            if data[field] is None:
+                data[field] = Decimal('0.00')
+        return data
 
 
 class TransactionSerializer(serializers.ModelSerializer):

@@ -4,8 +4,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from wallet.models import WalletTransaction
-from wallet.services import credit
+from wallet.services import credit, record_successful_transaction
 from .models import Ride, RideBooking
 
 
@@ -24,8 +23,8 @@ def settle_completed_ride_earnings():
         for booking in bookings:
             net = (Decimal(str(ride.price)) * (Decimal('1') - commission_rate)).quantize(Decimal('0.01'))
             credit(ride.driver, net, 'RIDE_INCOME', 'RIDE', f'Net earnings for ride {ride.pk}', booking.passenger)
-            WalletTransaction.objects.create(wallet=ride.driver.wallet, transaction_type='COMMISSION',
-                amount=(Decimal(str(ride.price)) * commission_rate).quantize(Decimal('0.01')),
+            record_successful_transaction(ride.driver.wallet, 'COMMISSION',
+                (Decimal(str(ride.price)) * commission_rate).quantize(Decimal('0.01')),
                 source='RIDE', description=f'Platform commission retained for ride {ride.pk} (informational)')
             booking.wallet_settlement = True
             booking.save(update_fields=['wallet_settlement'])

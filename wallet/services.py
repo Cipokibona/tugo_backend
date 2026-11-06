@@ -2,6 +2,7 @@
 from decimal import Decimal
 from django.db import transaction
 from django.db.models import F
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from .models import Wallet, WalletTransaction, WithdrawalRequest, Deposit
 
@@ -9,6 +10,24 @@ from .models import Wallet, WalletTransaction, WithdrawalRequest, Deposit
 def get_wallet(user):
     wallet, _ = Wallet.objects.get_or_create(user=user)
     return wallet
+
+
+@transaction.atomic
+def record_successful_transaction(wallet, transaction_type, amount, source='API', description='', related_user=None):
+    """Persist a completed ledger entry in the caller's balance transaction.
+
+    Call this only after the corresponding wallet mutation succeeds. The atomic
+    boundary ensures either both changes commit or neither does.
+    """
+    return WalletTransaction.objects.create(
+        wallet=wallet,
+        transaction_type=transaction_type,
+        amount=amount,
+        status='COMPLETED',
+        source=source,
+        description=description,
+        related_user=related_user,
+    )
 
 
 @transaction.atomic
@@ -22,8 +41,7 @@ def credit(user, amount, transaction_type='BONUS', source='API', description='',
         wallet.total_earned = F('total_earned') + amount
     wallet.save(update_fields=['balance', 'total_earned', 'updated_at'])
     wallet.refresh_from_db()
-    WalletTransaction.objects.create(wallet=wallet, transaction_type=transaction_type, amount=amount,
-        source=source, description=description, related_user=related_user)
+    record_successful_transaction(wallet, transaction_type, amount, source, description, related_user)
     return wallet
 
 
@@ -38,8 +56,7 @@ def debit(user, amount, transaction_type='ADJUSTMENT', source='API', description
     wallet.balance = F('balance') - amount
     wallet.save(update_fields=['balance', 'updated_at'])
     wallet.refresh_from_db()
-    WalletTransaction.objects.create(wallet=wallet, transaction_type=transaction_type, amount=-amount,
-        source=source, description=description, related_user=related_user)
+    record_successful_transaction(wallet, transaction_type, -amount, source, description, related_user)
     return wallet
 
 
@@ -77,8 +94,8 @@ def create_withdrawal(user, amount, method, phone_number, account_holder_name, n
     wallet.refresh_from_db()
     request = WithdrawalRequest.objects.create(wallet=wallet, amount=amount, method=method,
         phone_number=phone_number, account_holder_name=account_holder_name, notes=notes)
-    WalletTransaction.objects.create(wallet=wallet, transaction_type='WITHDRAWAL_REQUEST', amount=-amount,
-        status='PENDING', source='WITHDRAWAL', description=f'Withdrawal request {request.pk}')
+    # A request remains a WithdrawalRequest until it is actually paid. It is not
+    # a completed transaction and therefore does not belong in transaction history.
     return request
 
 
@@ -96,16 +113,17 @@ def process_withdrawal(request_obj, actor, decision, admin_notes=''):
         if decision == 'reject':
             wallet.balance = F('balance') + request_obj.amount
             fields.append('balance')
-            tx_type, tx_amount, tx_status = 'WITHDRAWAL_REJECTED', request_obj.amount, 'REJECTED'
+            # The payout was rejected, but the successful restoration is a refund.
+            tx_type, tx_amount = 'REFUND', request_obj.amount
             request_obj.status = 'REJECTED'
         else:
             wallet.total_withdrawn = F('total_withdrawn') + request_obj.amount
             fields.append('total_withdrawn')
-            tx_type, tx_amount, tx_status = 'WITHDRAWAL_COMPLETED', -request_obj.amount, 'COMPLETED'
+            tx_type, tx_amount = 'WITHDRAWAL_COMPLETED', -request_obj.amount
             request_obj.status = 'COMPLETED'
         wallet.save(update_fields=fields)
-        WalletTransaction.objects.create(wallet=wallet, transaction_type=tx_type, amount=tx_amount,
-            status=tx_status, source='WITHDRAWAL', description=f'Withdrawal request {request_obj.pk}')
+        record_successful_transaction(wallet, tx_type, tx_amount, 'WITHDRAWAL',
+            f'Withdrawal request {request_obj.pk}' + (' rejected; available balance restored' if decision == 'reject' else ' paid'))
     else:
         raise ValidationError({'decision': 'Unknown action.'})
     request_obj.processed_by = actor

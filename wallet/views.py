@@ -22,7 +22,8 @@ class WalletView(APIView):
 class TransactionsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def get(self, request):
-        qs = WalletTransaction.objects.filter(wallet__user=request.user)
+        # Transaction history contains completed financial movements only.
+        qs = WalletTransaction.objects.filter(wallet__user=request.user, status='COMPLETED')
         for key, field in [('type', 'transaction_type'), ('status', 'status'), ('source', 'source'), ('reference', 'reference')]:
             if request.query_params.get(key): qs = qs.filter(**{field + '__icontains': request.query_params[key]})
         return Response(TransactionSerializer(qs[:500], many=True).data)
@@ -31,8 +32,9 @@ class TransactionsView(APIView):
 class DepositView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def post(self, request):
-        # Called after the AfriPay redirect, matching the existing ride checkout integration.
-        # Provider-side verification can replace this confirmation when AfriPay exposes a callback.
+        payment_status = str(request.data.get('payment_status', '')).strip().upper()
+        if payment_status not in {'SUCCESS', 'SUCCESSFUL', 'COMPLETED', 'PAID'}:
+            return Response({'detail': 'Deposit was not confirmed as successful.'}, status=status.HTTP_400_BAD_REQUEST)
         wallet = create_deposit(request.user, request.data.get('amount'),
                                  request.data.get('payment_method', 'AFRIPAY'), request.data.get('provider_reference', ''))
         return Response(WalletSerializer(wallet).data, status=201)
@@ -116,7 +118,7 @@ class AdminStatsView(APIView):
     permission_classes = [permissions.IsAdminUser]
     def get(self, request):
         today = timezone.localdate()
-        tx = WalletTransaction.objects.filter(created_at__date=today)
+        tx = WalletTransaction.objects.filter(created_at__date=today, status='COMPLETED')
         return Response({
             'total_money_in_wallets': Wallet.objects.aggregate(v=Sum('balance'))['v'] or Decimal('0'),
             'pending_withdrawals': WithdrawalRequest.objects.filter(status__in=['PENDING','APPROVED']).aggregate(v=Sum('amount'))['v'] or Decimal('0'),
@@ -131,7 +133,7 @@ class AdminStatsView(APIView):
 class AdminTransactionsView(APIView):
     permission_classes = [permissions.IsAdminUser]
     def get(self, request):
-        qs = WalletTransaction.objects.select_related('wallet__user').all()
+        qs = WalletTransaction.objects.select_related('wallet__user').filter(status='COMPLETED')
         filters = {'type': 'transaction_type', 'status': 'status', 'source': 'source', 'reference': 'reference'}
         for key, field in filters.items():
             if request.query_params.get(key): qs = qs.filter(**{field + ('__icontains' if key in ('type','source','reference') else ''): request.query_params[key]})
