@@ -102,6 +102,7 @@ class RideBooking(models.Model):
     passenger = models.ForeignKey(User, on_delete=models.CASCADE)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
     booked_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     special_requests = models.TextField(null=True, blank=True)
     payment_method = models.CharField(max_length=16, default='AFRIPAY')
     is_disputed = models.BooleanField(default=False)

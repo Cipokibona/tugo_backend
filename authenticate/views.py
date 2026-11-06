@@ -12,6 +12,12 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return User.objects.all().order_by('username')
+        return User.objects.filter(pk=user.pk)
+
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def change_password(self, request):
         serializer = ChangePasswordSerializer(data=request.data, context={'request': request})

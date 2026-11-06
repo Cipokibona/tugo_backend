@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 
 from django.conf import settings
 from rest_framework import permissions, status, viewsets
@@ -88,18 +88,32 @@ class PushSubscriptionView(APIView):
         if raw_expiration in [None, '']:
             return None
 
-        if isinstance(raw_expiration, (int, float)):
+        if isinstance(raw_expiration, datetime):
+            if raw_expiration.tzinfo is None:
+                return raw_expiration.replace(tzinfo=timezone.utc)
+            return raw_expiration
+
+        if isinstance(raw_expiration, date):
+            return datetime.combine(raw_expiration, time.min, tzinfo=timezone.utc)
+
+        if isinstance(raw_expiration, (int, float)) and not isinstance(raw_expiration, bool):
             try:
                 return datetime.fromtimestamp(raw_expiration / 1000, tz=timezone.utc)
             except Exception:
                 return None
 
-        if isinstance(raw_expiration, str):
-            # Accept ISO string format if provided by client.
+        if isinstance(raw_expiration, bytes):
             try:
-                cleaned = raw_expiration.replace('Z', '+00:00')
-                return datetime.fromisoformat(cleaned)
+                raw_expiration = raw_expiration.decode()
             except Exception:
                 return None
 
-        return None
+        if not isinstance(raw_expiration, str):
+            raw_expiration = str(raw_expiration)
+
+        # Accept ISO string format if provided by client.
+        try:
+            cleaned = raw_expiration.strip().replace('Z', '+00:00')
+            return datetime.fromisoformat(cleaned)
+        except Exception:
+            return None

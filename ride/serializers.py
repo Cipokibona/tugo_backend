@@ -71,6 +71,7 @@ class RideBookingSerializer(serializers.ModelSerializer):
             'passenger_username',
             'status',
             'booked_at',
+            'updated_at',
             'special_requests',
             'payment_method',
         ]
